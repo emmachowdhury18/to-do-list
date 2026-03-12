@@ -1,66 +1,100 @@
 'use client';
 
 import { Button } from "@/components";
-import { AddNewTaskModal } from "@/components/modals/AddNewTaskModal";
 import { useState } from "react";
-import * as Dialog from '@radix-ui/react-dialog'
-import { CalendarIcon, CheckboxIcon, Cross1Icon, Pencil1Icon } from "@radix-ui/react-icons";
+import * as Dialog from '@radix-ui/react-dialog';
 import { Input } from "@/components/ui/input";
 import { Task } from "@/types/task.type";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldGroup } from "@/components/ui/field";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Controller, useForm } from "react-hook-form";
+import * as z from "zod";
+import { Pencil1Icon } from "@radix-ui/react-icons";
+
+const formSchema = z.object({
+  task: z.string(),
+  id: z.number(),
+  completed: z.boolean()
+});
+
+const defaultValues = {task: "", id: 0, completed: false};
 
 export default function Home() {
-  //const [isAddTaskModalOpen, setIsAddTaskModalOpen] = useState(false);
-  const [task, setTask] = useState([{}]);
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [id, setId] = useState(1);
 
-  const form = useForm({defaultValues: {task: "", id: 0}})
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: defaultValues
+  })
 
-  const addNewTask = (data: Task) => {
-    setTask([...task, {task: data.task, id: id}]);
+  function onAddNewTask(data: Task) {
+    if (!data.task){
+      return;
+    }
+    setAllTasks([...allTasks, {task: data.task, id: id, completed: false}]);
     setId(id + 1);
+    form.reset(defaultValues);
   }
 
-  const testData: Task[] = [
-    {
-      id: 1,
-      task: 'Say hi to Fuzzy'
-    },
-    {
-      id: 2,
-      task: 'Say hi to Asa'
-    },
-    {
-      id: 3,
-      task: 'Eat an apple'
-    }
-  ]
+  async function handleCheckClick(id: number) {
+    const newTasks = allTasks.slice();
+    let index = newTasks.findIndex(task => task.id === id);
+    newTasks[index].completed = !newTasks[index].completed;
+    setAllTasks(newTasks);
+  }
+
+  async function handlePencilClick(id: number, e: string) {
+    const newTasks = allTasks.slice();
+    let index = newTasks.findIndex(task => task.id === id);
+    newTasks[index].task = e;
+    setAllTasks(newTasks);
+  }
 
   return (
     <div className="py-10">
       <div className="flex flex-col justify-center space-y-4">
-        <FieldGroup>
-          <Field 
-            className="mx-auto max-w-sm rounded-md"
-            orientation="horizontal">
-            <Input
-              className="bg-gray-100"
-              placeholder="Add new task..."
+        <form id="add-new-task-form"
+          onSubmit={form.handleSubmit(onAddNewTask)}>
+          <FieldGroup>
+            <Controller
+              name="task"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field 
+                  className="mx-auto max-w-sm rounded-md"
+                  orientation="horizontal"
+                  data-invalid={fieldState.invalid}>
+                  <Input
+                    {...field}
+                    className="bg-gray-100"
+                    id="form-rhf-demo-title"
+                    aria-invalid={fieldState.invalid}
+                    placeholder="Add new task..."
+                    autoComplete="off"
+                  />
+                  <Button  
+                    type="submit" 
+                    form="add-new-task-form"
+                    className="cursor-pointer bg-indigo-500 hover:bg-indigo-800">
+                    Add
+                  </Button>
+                </Field>
+              )}
             />
-            <Button className="cursor-pointer bg-indigo-500 hover:bg-indigo-800">
-              Add
-            </Button>
-          </Field>
-        </FieldGroup>
+          </FieldGroup>
+        </form>
 
 
         <div className="px-10">
           <div className="mx-auto max-w-sm space-y-4 rounded-lg bg-indigo-100 p-4">
-            {testData.map((task) => (
+            {allTasks.sort((a, b) => Number(a.completed) - Number(b.completed)).map((task) => (
               <SingleTask
                 key={task.id}
                 data={task}
+                onCheckClick={() => handleCheckClick(task.id)}
+                onPencilClick={(e) => handlePencilClick(task.id, e)}
               />
             ))}
           </div>
@@ -117,33 +151,35 @@ export default function Home() {
   );
 }
 
-// function TaskFields(){
-//   return (
-//     <div className="space-y-6">
-//       <div>
-//         <Input className="mt-2" type="text">
-//         </Input>
-//       </div>
-//     </div>
-//   )
-// }
-
-function SingleTask({data}: {data: Task}) {
+function SingleTask({data, onCheckClick, onPencilClick }: {data: Task, onCheckClick: () => {}, onPencilClick: (data: string) => {}}) {
   return (
     <div className="flex justify-between rounded-lg bg-white px-4 py-4 text-gray-800">
       <div>
-        <p>{data.task}</p>
+        {data.completed ? 
+        (
+          <p className="line-through">{data.task}</p>
+        ) : (
+          <input
+            type="text"
+            value={data.task}
+            onChange={(e) => onPencilClick(e.target.value)}
+          />
+        )}
       </div>
       <div>
-        <button className="rounded p-2 cursor-pointer">
+        {/* <button 
+          className="rounded p-2 cursor-pointer"
+          onClick={onPencilClick}
+          disabled={data.completed}>
           <Pencil1Icon />
-        </button>
-        <Checkbox className="cursor-pointer" />
+        </button> */}
+        <Checkbox 
+          className="cursor-pointer" 
+          checked={data.completed}
+          onCheckedChange={onCheckClick}
+        />
       </div>
     </div>
   )
-}
-function useForm(arg0: {}) {
-  throw new Error("Function not implemented.");
 }
 
